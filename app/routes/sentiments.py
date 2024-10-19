@@ -6,6 +6,33 @@ from typing import List, Optional
 
 router = APIRouter()
 
+def generate_time_series(start_time: datetime, end_time: datetime, aggregation_type: str) -> List[str]:
+    """Generate a complete time series between start_time and end_time."""
+    time_format = "%Y-%m-%d %H:00" if aggregation_type == 'hourly' else "%Y-%m-%d %H:%M"
+    delta = timedelta(hours=1) if aggregation_type == 'hourly' else timedelta(minutes=1)
+    time_series = []
+    current_time = start_time
+    while current_time <= end_time:
+        time_series.append(current_time.strftime(time_format))
+        current_time += delta
+    return time_series
+
+def fill_missing_data(data: List[dict], time_series: List[str]) -> List[dict]:
+    """Fill in missing time units with zero counts."""
+    data_dict = {item['time_unit']: item for item in data}
+    filled_data = []
+    for time_unit in time_series:
+        if time_unit in data_dict:
+            filled_data.append(data_dict[time_unit])
+        else:
+            filled_data.append({
+                'time_unit': time_unit,
+                'positives': 0,
+                'negatives': 0,
+                'neutrals': 0
+            })
+    return filled_data
+
 @router.get("/sentiment_aggregation")
 async def get_sentiment_aggregation(
     keywords: str,
@@ -88,7 +115,7 @@ async def get_sentiment_aggregation(
 
     results = list(db.reddit.aggregate(pipeline))
 
-    # Format the final output
+    # Format the initial output
     formatted_output = [
         {
             "time_unit": result["_id"],
@@ -99,4 +126,10 @@ async def get_sentiment_aggregation(
         for result in results
     ]
 
-    return formatted_output
+    # Generate complete time series
+    time_series = generate_time_series(start_time, end_time, aggregation_type)
+
+    # Fill in missing data with zeros
+    filled_output = fill_missing_data(formatted_output, time_series)
+
+    return filled_output
