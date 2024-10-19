@@ -26,7 +26,6 @@ app.include_router(auth.router, prefix="/jwt", tags=["authentication"])
 app.include_router(user.router, prefix="/auth", tags=["user"])
 app.include_router(big_transactions.router, prefix="/whales",tags=["websocket"])
 app.include_router(transactions_stats.router, prefix="/stats",tags=["websocket"])
-app.include_router(cryptos.router, prefix="/cryptos",tags=["cryptos"])
 
 if __name__ == "__main__":
     import uvicorn
