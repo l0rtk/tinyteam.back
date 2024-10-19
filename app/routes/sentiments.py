@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from ..database import get_db
 from datetime import datetime, timedelta
 from pymongo import DESCENDING
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 router = APIRouter()
 
@@ -133,3 +133,76 @@ async def get_sentiment_aggregation(
     filled_output = fill_missing_data(formatted_output, time_series)
 
     return filled_output
+
+
+
+@router.get("/sentiment_pie_chart")
+async def get_sentiment_pie_chart(
+    keywords: str,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    subreddit: Optional[str] = None
+) -> Dict[str, int]:
+    """
+    Endpoint to get aggregated sentiment data for specified keywords as pie chart data.
+
+    This endpoint provides a summary of positive, negative, and neutral posts
+    for the entire specified time range.
+
+    Query parameters:
+    - keywords: Comma-separated list of keywords to track (required)
+    - start_time: Start of the time range (optional, defaults to 24 hours ago)
+    - end_time: End of the time range (optional, defaults to current time)
+    - subreddit: Filter posts by subreddit (optional)
+
+    Returns a dictionary containing:
+    - positives: Total count of positive sentiment posts
+    - negatives: Total count of negative sentiment posts
+    - neutrals: Total count of neutral sentiment posts
+    """
+    db = get_db()
+
+    # Process keywords
+    keyword_list = [k.strip().lower() for k in keywords.split(',')]
+
+    # Set default time range if not provided
+    if not start_time:
+        start_time = datetime.utcnow() - timedelta(hours=24)
+    if not end_time:
+        end_time = datetime.utcnow()
+
+    # Prepare the query
+    query = {
+        "keyword": {"$in": keyword_list},
+        "created_utc": {"$gte": start_time.timestamp(), "$lte": end_time.timestamp()}
+    }
+    if subreddit:
+        query["subreddit"] = subreddit
+
+    # Aggregation pipeline
+    pipeline = [
+        {"$match": query},
+        {"$group": {
+            "_id": None,
+            "positives": {
+                "$sum": {"$cond": [{"$eq": ["$sentiment_label", "positive"]}, 1, 0]}
+            },
+            "negatives": {
+                "$sum": {"$cond": [{"$eq": ["$sentiment_label", "negative"]}, 1, 0]}
+            },
+            "neutrals": {
+                "$sum": {"$cond": [{"$eq": ["$sentiment_label", "neutral"]}, 1, 0]}
+            }
+        }}
+    ]
+
+    result = list(db.reddit.aggregate(pipeline))
+
+    if not result:
+        return {"positives": 0, "negatives": 0, "neutrals": 0}
+
+    return {
+        "positives": result[0]["positives"],
+        "negatives": result[0]["negatives"],
+        "neutrals": result[0]["neutrals"]
+    }
