@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, user, posts, sentiments, tickers, news 
+from app.routes import auth, user, posts, sentiments, tickers, news, llm 
 from app.database import init_db
 from dotenv import load_dotenv
 import os
@@ -28,6 +28,7 @@ app.include_router(posts.router, prefix="/posts",tags=["websocket"])
 app.include_router(sentiments.router, prefix="/sentiments",tags=["sentiments"])
 app.include_router(tickers.router, prefix="/tickers",tags=["tickers"])
 app.include_router(news.router, prefix="/news",tags=["news"])
+app.include_router(llm.router, prefix="/llm",tags=["LLM"])
 
 if __name__ == "__main__":
     import uvicorn
